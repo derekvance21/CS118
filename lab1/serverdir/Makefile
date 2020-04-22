@@ -1,4 +1,4 @@
-default: server clean
+default: clean server
 
 server:
 	gcc server.c -o server -Wall -Wextra

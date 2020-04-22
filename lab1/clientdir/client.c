@@ -4,13 +4,13 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
 
-#define MAXLINE 4096 /*max text line length*/
+#define RESPONSE_SIZE 1048576
+#define REQUEST_SIZE 4096
 #define SERV_PORT 9000 /*port*/
 
-#define HTTPREQUEST
-
-char httpRequest[MAXLINE];
 
 int main(int argc, char **argv) {
     //basic check of the arguments
@@ -42,28 +42,33 @@ int main(int argc, char **argv) {
     }
     //Client connected to server
 
-    char sendline[MAXLINE], recvline[MAXLINE];
+    char httpRequest[REQUEST_SIZE];
+    char httpResponse[RESPONSE_SIZE];
 
-    while (fgets(sendline, MAXLINE, stdin) != NULL) {
-        send(sockfd, sendline, strlen(sendline), 0);
+    sprintf(httpRequest, "GET /%s HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nUser-agent: Mozilla/5.0\r\n", argv[2]);
 
-        if (recv(sockfd, recvline, MAXLINE,0) == 0){
+    send(sockfd, httpRequest, strlen(httpRequest), 0);
+    int n;
+    if ((n = recv(sockfd, httpResponse, RESPONSE_SIZE, 0)) == 0) {
         //error: server terminated prematurely
-            perror("The server terminated prematurely"); 
-            exit(4);
-        }
-        printf("%s", "String received from the server: ");
-        fputs(recvline, stdout);
-
-        if (strcmp(sendline,"q\n")==0) {
-        printf("Close connection...\n");
-        break;
-        }
-
-        memset(sendline, '\0', MAXLINE);
-        memset(recvline, '\0', MAXLINE);
+        perror("The server terminated prematurely"); 
+        exit(4);
     }
-
     close(sockfd);
+
+    printf("HTTP response received from the server:\n%s", httpResponse);
+    printf("\nSize of response: %d\n", n);
+    int i;
+    for (i = 0; i < n - 3; i++) {
+        if (httpResponse[i] == '\r' && httpResponse[i+1] == '\n' && httpResponse[i+2] == '\r' && httpResponse[i+3] == '\n') {
+            int body = i + 4;
+            printf("Start of body: %d\n", body);
+            int fd = open("object", O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+            write(fd, &httpResponse[body], n - body);
+            break;
+        }
+    }
+    printf("Closing connection...\n");
+
     return 0;
 }
