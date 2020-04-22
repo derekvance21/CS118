@@ -3,16 +3,18 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h> // for inet_ntoa
 #include <string.h>
+#include <unistd.h> // for close
 
 #define MAXLINE 4096 /*max text line length*/
 #define SERV_PORT 9000 /*port*/
 #define LISTENQ 20 /*maximum number of client connections */
 
-int main (int argc, char **argv)
-{
-	pid_t childpid;
+// 164.67.100.209
 
+int main ()
+{
 	//creation of the socket
 	int listenfd = socket (AF_INET, SOCK_STREAM, 0);
 
@@ -27,6 +29,7 @@ int main (int argc, char **argv)
 		perror("bind");
 		exit(1);
 	}
+	printf("Server IP address: %s\n", inet_ntoa(servaddr.sin_addr));
 
 	if (listen(listenfd, LISTENQ)==-1) {
 		perror("listen");
@@ -47,7 +50,7 @@ int main (int argc, char **argv)
 					
 		while ( (n = recv(connfd, buf, MAXLINE,0)) > 0)  {
 			// printf("%s","String received from and resent to the client:");
-			printf("HTTP Request received from client:\n")
+			printf("HTTP Request received from client:\n");
 			puts(buf);
 			// send(connfd, buf, n, 0);
 			// 	if (strcmp(buf,"q\n")==0) {
@@ -73,4 +76,5 @@ int main (int argc, char **argv)
 	//close listening socket
 	printf("Close listening socket...\n");
 	close (listenfd); 
+	return 0;
 }
