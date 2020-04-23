@@ -8,9 +8,9 @@
 #include <unistd.h> // for close
 #include <fcntl.h>
 
-#define OBJECT_SIZE 1048576
+#define OBJECT_SIZE 2000000
 #define REQUEST_SIZE 4096
-#define LISTENQ 20 /*maximum number of client connections */
+#define LISTENQ 20 // maximum number of client connections
 
 #define SERV_PORT 9000
 
@@ -94,9 +94,20 @@ int main ()
 				sprintf(response_buf, "HTTP/1.1 200 OK\r\nContent-Length: %d\r\nContent-Type: %s\r\n\r\n", obj_bytes, file_format);
 			}
 		}
+		printf("bytes read from object: %d\n", obj_bytes);
 		int header_size = strlen(response_buf);
-		memcpy(&response_buf[header_size], object_buf, obj_bytes);
-		send(connfd, response_buf, header_size + obj_bytes, 0);
+		printf("bytes in header: %d\n", header_size);
+		send(connfd, response_buf, header_size, 0);
+		int i;
+		for (i = 0; i < obj_bytes / 4096 - 1; i++) {
+			// printf("sending bytes %d - %d\n", i * 4096, (i + 1) * 4096);
+			send(connfd, &object_buf[i * 4096], 4096, 0);
+		}
+		send(connfd, &object_buf[i * 4096], obj_bytes % 4096, 0);
+		// memcpy(&response_buf[header_size], object_buf, obj_bytes);
+		// int response_size = strlen(response_buf);
+		// printf("bytes in response_buf: %d\n", response_size);
+		// send(connfd, response_buf, header_size + obj_bytes, 0);
 
 		memset(request_buf, '\0', REQUEST_SIZE);
 		memset(object_buf, '\0', OBJECT_SIZE);

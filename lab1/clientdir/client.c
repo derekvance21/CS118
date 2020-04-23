@@ -54,7 +54,6 @@ int main(int argc, char **argv) {
         perror("The server terminated prematurely"); 
         exit(4);
     }
-    close(sockfd);
 
     printf("HTTP response received from the server:\n%s", httpResponse);
     printf("\nSize of response: %d\n", n);
@@ -69,6 +68,8 @@ int main(int argc, char **argv) {
         }
     }
     printf("Closing connection...\n");
+    close(sockfd);
+
 
     return 0;
 }
