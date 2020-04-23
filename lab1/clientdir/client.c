@@ -49,25 +49,38 @@ int main(int argc, char **argv) {
 
     send(sockfd, httpRequest, strlen(httpRequest), 0);
     int n;
-    if ((n = recv(sockfd, httpResponse, RESPONSE_SIZE, 0)) == 0) {
-        //error: server terminated prematurely
-        perror("The server terminated prematurely"); 
-        exit(4);
-    }
+    int bodyfound = 0;
+    int fd = open("object", O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+    while ((n = recv(sockfd, httpResponse, RESPONSE_SIZE, 0)) > 0) {
 
-    printf("HTTP response received from the server:\n%s", httpResponse);
-    printf("\nSize of response: %d\n", n);
-    int i;
-    for (i = 0; i < n - 3; i++) {
-        if (httpResponse[i] == '\r' && httpResponse[i+1] == '\n' && httpResponse[i+2] == '\r' && httpResponse[i+3] == '\n') {
-            int body = i + 4;
-            printf("Start of body: %d\n", body);
-            int fd = open("object", O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-            write(fd, &httpResponse[body], n - body);
-            break;
+    
+    // if ((n = recv(sockfd, httpResponse, RESPONSE_SIZE, 0)) == 0) {
+    //     //error: server terminated prematurely
+    //     perror("The server terminated prematurely"); 
+    //     exit(4);
+    // }
+
+        //printf("HTTP response received from the server:\n%s", httpResponse);
+        //printf("\nSize of response: %d\n", n);
+        if (bodyfound) {
+            write(fd, httpResponse, n);
+        }
+        else {
+            int i;
+            for (i = 0; i < n - 3; i++) {
+                if (httpResponse[i] == '\r' && httpResponse[i+1] == '\n' && httpResponse[i+2] == '\r' && httpResponse[i+3] == '\n') {
+                    bodyfound = 1;
+                    int body = i + 4;
+                    printf("HTTP Response message: \n\n");
+                    write(1, httpResponse, i);
+                    printf("\n\n");
+                    write(fd, &httpResponse[body], n - body);
+                    break;
+                }
+            }
         }
     }
-    printf("Closing connection...\n");
+    printf("\nClosing connection...\n");
     close(sockfd);
 
 

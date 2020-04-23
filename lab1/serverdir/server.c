@@ -7,9 +7,9 @@
 #include <string.h>
 #include <unistd.h> // for close
 #include <fcntl.h>
+#include <sys/stat.h> // for file size
 
-#define OBJECT_SIZE 2000000
-#define REQUEST_SIZE 4096
+#define CHUNK_SIZE 4096
 #define LISTENQ 20 // maximum number of client connections
 
 #define SERV_PORT 9000
@@ -41,16 +41,15 @@ int main ()
 	socklen_t clilen;
 	int connfd;
 	printf("%s\n","Server running...waiting for connections.");
-
 	for ( ; ; ) {
 		clilen = sizeof(cliaddr);
 		connfd = accept (listenfd, (struct sockaddr *) &cliaddr, &clilen);
 		printf("%s\n","Accepted client connection...");
-		char object_buf[OBJECT_SIZE];
-		char request_buf[REQUEST_SIZE];
-		char response_buf[OBJECT_SIZE+REQUEST_SIZE];
+		char object_buf[CHUNK_SIZE];
+		char request_buf[CHUNK_SIZE];
+		char response_buf[CHUNK_SIZE];
 					
-		int request_bytes = recv(connfd, request_buf, REQUEST_SIZE, 0);
+		int request_bytes = recv(connfd, request_buf, CHUNK_SIZE, 0);
 		if (request_bytes < 0) {
 			perror("Read error");
 			exit(1);
@@ -58,8 +57,8 @@ int main ()
 		printf("HTTP Request received from client:\n\n");
 		puts(request_buf);
 
-		int obj_bytes = 0;
-
+		int file_size = 0;
+		int fd;
 		if (strncmp(request_buf, "GET /", 5) != 0) {
 			sprintf(response_buf, "HTTP/1.1 400 Bad Request\r\n");
 		}
@@ -79,7 +78,7 @@ int main ()
 				}
 			}
 			file_request[i - 5] = '\0'; file_format[i - dotloc - 1] = '\0';
-			int fd = open(file_request, O_RDONLY);
+			fd = open(file_request, O_RDONLY);
 			if (fd < 0) {
 				sprintf(response_buf, "HTTP/1.1 404 Not Found\r\n");
 			}
@@ -89,28 +88,31 @@ int main ()
 				else if (strcmp(file_format, "jpg") == 0) strcpy(file_format, "image/jpeg");
 				else if (strcmp(file_format, "txt") == 0) strcpy(file_format, "text/plain");
 				else if (strcmp(file_format, "html") == 0) strcpy(file_format, "text/html");
+
+				struct stat st;
+				stat(file_request, &st);
+				file_size = st.st_size;
+				printf("file_size: %d\n", file_size);
 				
-				obj_bytes = read(fd, object_buf, OBJECT_SIZE);
-				sprintf(response_buf, "HTTP/1.1 200 OK\r\nContent-Length: %d\r\nContent-Type: %s\r\n\r\n", obj_bytes, file_format);
+				sprintf(response_buf, "HTTP/1.1 200 OK\r\nContent-Length: %d\r\nContent-Type: %s\r\n\r\n", file_size, file_format);
 			}
 		}
-		printf("bytes read from object: %d\n", obj_bytes);
-		int header_size = strlen(response_buf);
-		printf("bytes in header: %d\n", header_size);
-		send(connfd, response_buf, header_size, 0);
+		send(connfd, response_buf, strlen(response_buf), 0);
 		int i;
-		for (i = 0; i < obj_bytes / 4096 - 1; i++) {
-			// printf("sending bytes %d - %d\n", i * 4096, (i + 1) * 4096);
-			send(connfd, &object_buf[i * 4096], 4096, 0);
+		int chunks = file_size / 4096;
+		for (i = 0; i < chunks; i++) {
+            int chunk_size = read(fd, object_buf, 4096); // should always be 4096 anyways but alas
+			send(connfd, object_buf, chunk_size, 0);
 		}
-		send(connfd, &object_buf[i * 4096], obj_bytes % 4096, 0);
+        read(fd, object_buf, file_size % 4096);
+		send(connfd, object_buf, file_size % 4096, 0);
 		// memcpy(&response_buf[header_size], object_buf, obj_bytes);
 		// int response_size = strlen(response_buf);
 		// printf("bytes in response_buf: %d\n", response_size);
 		// send(connfd, response_buf, header_size + obj_bytes, 0);
 
-		memset(request_buf, '\0', REQUEST_SIZE);
-		memset(object_buf, '\0', OBJECT_SIZE);
+		memset(request_buf, '\0', CHUNK_SIZE);
+		memset(object_buf, '\0', CHUNK_SIZE);
 				
 		printf("Close connection fd...\n\n");
 		close(connfd);
