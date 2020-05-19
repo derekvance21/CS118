@@ -1,0 +1,18 @@
+NAME: Derek Vance
+EMAIL: dvance@g.ucla.edu
+UID: 604970765
+
+Design of server:
+    The server is designed to handle HTTP GET requests.
+    When a server receives a message, it looks for the <file_name> in GET /<file_name>.
+    After opening the file, it collects the file size and file extension and uses it to populate
+    the Content-Length and Content-Type headers in the HTTP response message. After sending the headers,
+    the server then sends the file contents over the socket, resets the buffers, 
+    and is ready for the next HTTP request.
+
+Problems:
+    The biggest problem I ran in to related to sending large objects over the socket. For the binary file,
+    which is 1000000 bytes long, I used one single write over the socket. The client wouldn't receive the 
+    entire binary file. Instead, I wrote enough 4096 byte chunks individually to send over the entire object, 
+    which worked. 
+
